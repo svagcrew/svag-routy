@@ -10,6 +10,21 @@ type PumpedRouteGetterInputBase = {
   anchor?: string
 }
 
+type CreateNestedRoute<T extends string | undefined = undefined> = {
+  <T2 extends string>(props: {
+    parent?: Route<any>
+    params?: T2[]
+    getter: (routeParams: Record<T2, Stringable>) => string
+    baseUrl?: string
+    definitionParamsPrefix?: string
+  }): RouteWithParams<T extends string ? T | T2 : T2>
+  <T2 extends string>(
+    routeParamsDefinition: T2[],
+    routeGetter: (routeParams: Record<T2, Stringable>) => string
+  ): RouteWithParams<T extends string ? T | T2 : T2>
+  (routeGetter: () => string): T extends string ? RouteWithParams<T> : RouteWithoutParams
+}
+
 export type RouteWithoutParams = {
   get: (routeParams?: PumpedRouteGetterInputBase) => string
   placeholders: {}
@@ -18,6 +33,7 @@ export type RouteWithoutParams = {
   getDefinition: (definitionParamsPrefix?: string) => string
   validateRouteParams: (routeParams: any) => {}
   normalizeRouteParams: (routeParams: any) => {}
+  createRoute: CreateNestedRoute
 }
 export type RouteWithParams<T extends string> = {
   get: (routeParams: Record<T, Stringable> & PumpedRouteGetterInputBase) => string
@@ -27,6 +43,7 @@ export type RouteWithParams<T extends string> = {
   getDefinition: (definitionParamsPrefix?: string) => string
   validateRouteParams: (routeParams: any) => Record<T, string>
   normalizeRouteParams: (routeParams: any) => Partial<Record<T, string>>
+  createRoute: CreateNestedRoute<T>
 }
 export type Route<T extends string | undefined = string> = T extends string ? RouteWithParams<T> : RouteWithoutParams
 
@@ -36,12 +53,17 @@ const mergeRouteStrings = (...routeStrings: string[]) => {
 }
 
 const normalizeCreateRouteInput = (routeParamsOrGetRoute: any, maybeGetRoute: any) => {
-  const routeParamsDefinition: string[] | undefined =
+  const routeParamsDefinitionSelf: string[] | undefined =
     typeof routeParamsOrGetRoute === 'function'
       ? []
       : 'getter' in routeParamsOrGetRoute
         ? routeParamsOrGetRoute.params
         : routeParamsOrGetRoute
+  const routeParamsDefinitionParent: string[] | undefined =
+    'getter' in routeParamsOrGetRoute && routeParamsOrGetRoute.parent?.placeholders
+      ? Object.keys(routeParamsOrGetRoute.parent?.placeholders)
+      : []
+  const routeParamsDefinition = [...(routeParamsDefinitionParent || []), ...(routeParamsDefinitionSelf || [])]
   const routeGetter: ((routeParams: Record<string, Stringable>) => string) | (() => string) =
     typeof routeParamsOrGetRoute === 'function'
       ? routeParamsOrGetRoute
@@ -142,7 +164,7 @@ function createRoute(routeParamsOrGetRoute?: any, maybeGetRoute?: any) {
     }
   }
 
-  return {
+  const route = {
     getPlaceholders,
     placeholders,
     getDefinition,
@@ -150,6 +172,23 @@ function createRoute(routeParamsOrGetRoute?: any, maybeGetRoute?: any) {
     validateRouteParams,
     normalizeRouteParams,
     get: pumpedRouteGetter,
+  }
+
+  const createNestedRoute = (routeParamsOrGetRoute: any, maybeGetRoute: any) => {
+    const { routeParamsDefinition, routeGetter, defaultBaseUrl, defaultDefinitionParamsPrefix } =
+      normalizeCreateRouteInput(routeParamsOrGetRoute, maybeGetRoute)
+    return (createRoute as any)({
+      params: routeParamsDefinition,
+      getter: routeGetter,
+      baseUrl: defaultBaseUrl,
+      definitionParamsPrefix: defaultDefinitionParamsPrefix,
+      parent: route,
+    })
+  }
+
+  return {
+    ...route,
+    createRoute: createNestedRoute as any,
   }
 }
 
