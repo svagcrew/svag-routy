@@ -8,6 +8,29 @@ type PumpedRouteGetterInputBase = {
   anchor?: string
 }
 
+type CreateRoute = {
+  <T extends string>(props: {
+    params?: T[]
+    getter: (routeParams: Record<T, Stringable>) => string | (() => string) | string
+    baseUrl?: string
+    definitionParamsPrefix?: string
+  }): RouteWithParams<T>
+  <T extends string, T2 extends string>(props: {
+    parent?: Route<T2>
+    params?: T[]
+    getter: (routeParams: Record<T, Stringable>) => string | (() => string) | string
+    baseUrl?: string
+    definitionParamsPrefix?: string
+  }): RouteWithParams<T | T2>
+  <T extends string>(
+    routeParamsDefinition: T[],
+    routeGetter: (routeParams: Record<T, Stringable>) => string
+  ): RouteWithParams<T>
+  (routeGetter: () => string): RouteWithoutParams
+  (routeString: string): RouteWithoutParams
+  (routeParamsOrGetRoute?: any, maybeGetRoute?: any): Route
+}
+
 type CreateNestedRouteOnWithoutParams = {
   <T2 extends string>(props: {
     params?: T2[]
@@ -20,6 +43,7 @@ type CreateNestedRouteOnWithoutParams = {
     routeGetter: (routeParams: Record<T2, Stringable>) => string
   ): RouteWithParams<T2>
   (routeGetter: () => string): RouteWithoutParams
+  (routeString: string): RouteWithoutParams
 }
 type CreateNestedRouteOnWithParams<T extends string> = {
   <T2 extends string>(props: {
@@ -33,6 +57,7 @@ type CreateNestedRouteOnWithParams<T extends string> = {
     routeGetter: (routeParams: Record<T2, Stringable>) => string
   ): RouteWithParams<T extends string ? T | T2 : T2>
   (routeGetter: () => string): RouteWithParams<T>
+  (routeString: string): RouteWithParams<T>
 }
 
 export type RouteWithoutParams = {
@@ -77,26 +102,40 @@ const prependSlashIfNoProtocol = (route: string) => {
 
 const normalizeCreateRouteInput = (routeParamsOrGetRoute: any, maybeGetRoute: any) => {
   const routeParamsDefinitionSelf: string[] | undefined =
-    typeof routeParamsOrGetRoute === 'function'
+    typeof routeParamsOrGetRoute === 'function' || typeof routeParamsOrGetRoute === 'string'
       ? []
-      : 'getter' in routeParamsOrGetRoute
+      : typeof routeParamsOrGetRoute === 'object' && 'getter' in routeParamsOrGetRoute
         ? routeParamsOrGetRoute.params
         : routeParamsOrGetRoute
   const routeParamsDefinitionParent: string[] | undefined =
-    'getter' in routeParamsOrGetRoute && routeParamsOrGetRoute.parent?.placeholders
+    typeof routeParamsOrGetRoute === 'object' &&
+    'getter' in routeParamsOrGetRoute &&
+    routeParamsOrGetRoute.parent?.placeholders
       ? Object.keys(routeParamsOrGetRoute.parent?.placeholders)
       : []
   const routeParamsDefinition = [...(routeParamsDefinitionParent || []), ...(routeParamsDefinitionSelf || [])]
   const routeGetter: ((routeParams: Record<string, Stringable>) => string) | (() => string) =
-    typeof routeParamsOrGetRoute === 'function'
-      ? routeParamsOrGetRoute
-      : 'getter' in routeParamsOrGetRoute
-        ? routeParamsOrGetRoute.getter
-        : maybeGetRoute
-  const defaultBaseUrl: string = 'getter' in routeParamsOrGetRoute ? routeParamsOrGetRoute.baseUrl : undefined
+    typeof routeParamsOrGetRoute === 'string'
+      ? () => routeParamsOrGetRoute
+      : typeof routeParamsOrGetRoute === 'function'
+        ? routeParamsOrGetRoute
+        : typeof routeParamsOrGetRoute === 'object' && 'getter' in routeParamsOrGetRoute
+          ? typeof routeParamsOrGetRoute.getter === 'string'
+            ? () => routeParamsOrGetRoute.getter
+            : routeParamsOrGetRoute.getter
+          : maybeGetRoute
+  const defaultBaseUrl: string =
+    typeof routeParamsOrGetRoute === 'object' && 'getter' in routeParamsOrGetRoute
+      ? routeParamsOrGetRoute.baseUrl
+      : undefined
   const defaultDefinitionParamsPrefix: string =
-    'getter' in routeParamsOrGetRoute ? routeParamsOrGetRoute.definitionParamsPrefix : undefined
-  const parentRoute: Route | undefined = 'getter' in routeParamsOrGetRoute ? routeParamsOrGetRoute.parent : undefined
+    typeof routeParamsOrGetRoute === 'object' && 'getter' in routeParamsOrGetRoute
+      ? routeParamsOrGetRoute.definitionParamsPrefix
+      : undefined
+  const parentRoute: Route | undefined =
+    typeof routeParamsOrGetRoute === 'object' && 'getter' in routeParamsOrGetRoute
+      ? routeParamsOrGetRoute.parent
+      : undefined
   return {
     routeParamsDefinition,
     routeGetter,
@@ -106,25 +145,7 @@ const normalizeCreateRouteInput = (routeParamsOrGetRoute: any, maybeGetRoute: an
   }
 }
 
-function createRoute<T extends string>(props: {
-  params?: T[]
-  getter: (routeParams: Record<T, Stringable>) => string
-  baseUrl?: string
-  definitionParamsPrefix?: string
-}): RouteWithParams<T>
-function createRoute<T extends string, T2 extends string>(props: {
-  parent?: Route<T2>
-  params?: T[]
-  getter: (routeParams: Record<T, Stringable>) => string
-  baseUrl?: string
-  definitionParamsPrefix?: string
-}): RouteWithParams<T | T2>
-function createRoute<T extends string>(
-  routeParamsDefinition: T[],
-  routeGetter: (routeParams: Record<T, Stringable>) => string
-): RouteWithParams<T>
-function createRoute(routeGetter: () => string): RouteWithoutParams
-function createRoute(routeParamsOrGetRoute?: any, maybeGetRoute?: any) {
+const createRoute: CreateRoute = (routeParamsOrGetRoute?: any, maybeGetRoute?: any) => {
   const { routeParamsDefinition, routeGetter, defaultBaseUrl, defaultDefinitionParamsPrefix, parentRoute } =
     normalizeCreateRouteInput(routeParamsOrGetRoute, maybeGetRoute)
   const getPlaceholders = (definitionParamsPrefix: string = ':') => {
