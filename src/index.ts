@@ -1,8 +1,6 @@
 /* eslint-disable func-style */
 type Stringable = string | number
 
-// TODO: parents with types
-
 type PumpedRouteGetterInputBase = {
   baseUrl?: string
   abs?: boolean
@@ -84,12 +82,18 @@ const normalizeCreateRouteInput = (routeParamsOrGetRoute: any, maybeGetRoute: an
 }
 
 function createRoute<T extends string>(props: {
-  parent?: Route<any>
   params?: T[]
   getter: (routeParams: Record<T, Stringable>) => string
   baseUrl?: string
   definitionParamsPrefix?: string
-}): T extends string ? RouteWithParams<T> : RouteWithoutParams
+}): RouteWithParams<T>
+function createRoute<T extends string, T2 extends string>(props: {
+  parent?: Route<T2>
+  params?: T[]
+  getter: (routeParams: Record<T, Stringable>) => string
+  baseUrl?: string
+  definitionParamsPrefix?: string
+}): RouteWithParams<T | T2>
 function createRoute<T extends string>(
   routeParamsDefinition: T[],
   routeGetter: (routeParams: Record<T, Stringable>) => string
