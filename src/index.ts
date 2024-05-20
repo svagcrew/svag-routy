@@ -9,21 +9,21 @@ type PumpedRouteGetterInputBase = {
 }
 
 const normalizeCreateRouteInput = (routeParamsOrGetRoute: any, maybeGetRoute: any) => {
-  const routeParamsDefinition =
+  const routeParamsDefinition: string[] | undefined =
     typeof routeParamsOrGetRoute === 'function'
       ? {}
       : 'getter' in routeParamsOrGetRoute
         ? routeParamsOrGetRoute.params
         : routeParamsOrGetRoute
-  const routeGetter =
+  const routeGetter: ((routeParams: Record<string, Stringable>) => string) | (() => string) =
     typeof routeParamsOrGetRoute === 'function'
       ? routeParamsOrGetRoute
       : 'getter' in routeParamsOrGetRoute
         ? routeParamsOrGetRoute.getter
         : maybeGetRoute
-  const defaultBaseUrl = ('getter' in routeParamsOrGetRoute ? routeParamsOrGetRoute.baseUrl : undefined) || ''
-  const defaultDefinitionParamsPrefix =
-    ('getter' in routeParamsOrGetRoute ? routeParamsOrGetRoute.definitionParamsPrefix : undefined) || ':'
+  const defaultBaseUrl: string = 'getter' in routeParamsOrGetRoute ? routeParamsOrGetRoute.baseUrl : undefined
+  const defaultDefinitionParamsPrefix: string =
+    'getter' in routeParamsOrGetRoute ? routeParamsOrGetRoute.definitionParamsPrefix : undefined
   return {
     routeParamsDefinition,
     routeGetter,
@@ -32,27 +32,31 @@ const normalizeCreateRouteInput = (routeParamsOrGetRoute: any, maybeGetRoute: an
   }
 }
 
-function createRoute<T extends Record<string, boolean>>(props: {
-  params?: T
-  getter: (routeParams: Record<keyof T, Stringable>) => string
+function createRoute<T extends string>(props: {
+  params?: T[]
+  getter: (routeParams: Record<T, Stringable>) => string
   baseUrl?: string
   definitionParamsPrefix?: string
 }): {
-  get: (routeParams: Record<keyof T, Stringable> & PumpedRouteGetterInputBase) => string
-  placeholders: Record<keyof T, string>
-  getPlaceholders: (definitionParamsPrefix?: string) => Record<keyof T, string>
+  get: (routeParams: Record<T, Stringable> & PumpedRouteGetterInputBase) => string
+  placeholders: Record<T, string>
+  getPlaceholders: (definitionParamsPrefix?: string) => Record<T, string>
   definition: string
   getDefinition: (definitionParamsPrefix?: string) => string
+  validateRouteParams: (routeParams: any) => Record<T, string>
+  normalizeRouteParams: (routeParams: any) => Partial<Record<T, string>>
 }
-function createRoute<T extends Record<string, boolean>>(
-  routeParamsDefinition: T,
-  routeGetter: (routeParams: Record<keyof T, Stringable>) => string
+function createRoute<T extends string>(
+  routeParamsDefinition: T[],
+  routeGetter: (routeParams: Record<T, Stringable>) => string
 ): {
-  get: (routeParams: Record<keyof T, Stringable> & PumpedRouteGetterInputBase) => string
-  placeholders: Record<keyof T, string>
-  getPlaceholders: (definitionParamsPrefix?: string) => Record<keyof T, string>
+  get: (routeParams: Record<T, Stringable> & PumpedRouteGetterInputBase) => string
+  placeholders: Record<T, string>
+  getPlaceholders: (definitionParamsPrefix?: string) => Record<T, string>
   definition: string
   getDefinition: (definitionParamsPrefix?: string) => string
+  validateRouteParams: (routeParams: any) => Record<T, string>
+  normalizeRouteParams: (routeParams: any) => Partial<Record<T, string>>
 }
 function createRoute(routeGetter: () => string): {
   get: (routeParams?: PumpedRouteGetterInputBase) => string
@@ -60,12 +64,22 @@ function createRoute(routeGetter: () => string): {
   getPlaceholders: (definitionParamsPrefix?: string) => {}
   definition: string
   getDefinition: (definitionParamsPrefix?: string) => string
+  validateRouteParams: (routeParams: any) => {}
+  normalizeRouteParams: (routeParams: any) => {}
 }
 function createRoute(routeParamsOrGetRoute?: any, maybeGetRoute?: any) {
   const { routeParamsDefinition, routeGetter, defaultBaseUrl, defaultDefinitionParamsPrefix } =
     normalizeCreateRouteInput(routeParamsOrGetRoute, maybeGetRoute)
-  const getPlaceholders = (definitionParamsPrefix: string = defaultDefinitionParamsPrefix) => {
-    return Object.fromEntries(Object.keys(routeParamsDefinition).map((key) => [key, `${definitionParamsPrefix}${key}`]))
+  const getPlaceholders = (definitionParamsPrefix: string = ':') => {
+    return (
+      routeParamsDefinition?.reduce(
+        (acc, param) => {
+          acc[param] = `${definitionParamsPrefix}${param}`
+          return acc
+        },
+        {} as Record<string, string>
+      ) || {}
+    )
   }
   const placeholders = getPlaceholders(defaultDefinitionParamsPrefix)
   const getDefinition = (definitionParamsPrefix?: string) => {
@@ -74,8 +88,29 @@ function createRoute(routeParamsOrGetRoute?: any, maybeGetRoute?: any) {
   }
   const definition = getDefinition(defaultDefinitionParamsPrefix)
 
+  const validateRouteParams = (routeParams: any) => {
+    const routeParamsKeys = Object.keys(routeParams)
+    const routeParamsDefinitionKeys = routeParamsDefinition || []
+    const missingKeys = routeParamsDefinitionKeys.filter((key) => !routeParamsKeys.includes(key))
+    if (missingKeys.length) {
+      throw new Error(`Missing route params: ${missingKeys.join(', ')}`)
+    }
+    return routeParams
+  }
+  const normalizeRouteParams = (routeParams: any) => {
+    const routeParamsDefinitionKeys = routeParamsDefinition || []
+    const normalizedRouteParams = routeParamsDefinitionKeys.reduce(
+      (acc, key) => {
+        acc[key] = routeParams[key]
+        return acc
+      },
+      {} as Record<string, string>
+    )
+    return normalizedRouteParams
+  }
+
   const pumpedRouteGetter = (routeParams?: PumpedRouteGetterInputBase) => {
-    const route = routeGetter(routeParams)
+    const route = routeGetter(routeParams as any)
     const searchParamsString = (() => {
       if (!routeParams?.searchParams) {
         return ''
@@ -91,7 +126,7 @@ function createRoute(routeParamsOrGetRoute?: any, maybeGetRoute?: any) {
     })()
     const relativePath = `${route}${searchParamsString}${anchorString}`
     if (routeParams?.abs) {
-      return `${routeParams.baseUrl || defaultBaseUrl}${relativePath}`
+      return `${routeParams.baseUrl || defaultBaseUrl || ''}${relativePath}`
     } else {
       return relativePath
     }
@@ -100,9 +135,14 @@ function createRoute(routeParamsOrGetRoute?: any, maybeGetRoute?: any) {
   pumpedRouteGetter.placeholders = placeholders
   pumpedRouteGetter.getDefinition = getDefinition
   pumpedRouteGetter.definition = definition
-  pumpedRouteGetter.get = routeGetter
+  pumpedRouteGetter.validateRouteParams = validateRouteParams
+  pumpedRouteGetter.normalizeRouteParams = normalizeRouteParams
+  pumpedRouteGetter.get = routeGetter as any
   return pumpedRouteGetter
 }
+
+export type Route = ReturnType<typeof createRoute>
+export type RouteParams<T extends { placeholders: Record<string, string> }> = T['placeholders']
 
 export const createRoutyThings = ({
   baseUrl = '/',
