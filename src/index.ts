@@ -8,9 +8,21 @@ type PumpedRouteGetterInputBase = {
   anchor?: string
 }
 
-type CreateNestedRoute<T extends string | undefined = undefined> = {
+type CreateNestedRouteOnWithoutParams = {
   <T2 extends string>(props: {
-    parent?: Route<any>
+    params?: T2[]
+    getter: (routeParams: Record<T2, Stringable>) => string
+    baseUrl?: string
+    definitionParamsPrefix?: string
+  }): T2 extends string ? RouteWithParams<T2> : RouteWithoutParams
+  <T2 extends string>(
+    routeParamsDefinition: T2[],
+    routeGetter: (routeParams: Record<T2, Stringable>) => string
+  ): RouteWithParams<T2>
+  (routeGetter: () => string): RouteWithoutParams
+}
+type CreateNestedRouteOnWithParams<T extends string> = {
+  <T2 extends string>(props: {
     params?: T2[]
     getter: (routeParams: Record<T2, Stringable>) => string
     baseUrl?: string
@@ -20,7 +32,7 @@ type CreateNestedRoute<T extends string | undefined = undefined> = {
     routeParamsDefinition: T2[],
     routeGetter: (routeParams: Record<T2, Stringable>) => string
   ): RouteWithParams<T extends string ? T | T2 : T2>
-  (routeGetter: () => string): T extends string ? RouteWithParams<T> : RouteWithoutParams
+  (routeGetter: () => string): RouteWithParams<T>
 }
 
 export type RouteWithoutParams = {
@@ -31,7 +43,7 @@ export type RouteWithoutParams = {
   getDefinition: (definitionParamsPrefix?: string) => string
   validateRouteParams: (routeParams: any) => {}
   normalizeRouteParams: (routeParams: any) => {}
-  createRoute: CreateNestedRoute
+  createRoute: CreateNestedRouteOnWithoutParams
 }
 export type RouteWithParams<T extends string> = {
   get: (routeParams: Record<T, Stringable> & PumpedRouteGetterInputBase) => string
@@ -41,13 +53,26 @@ export type RouteWithParams<T extends string> = {
   getDefinition: (definitionParamsPrefix?: string) => string
   validateRouteParams: (routeParams: any) => Record<T, string>
   normalizeRouteParams: (routeParams: any) => Partial<Record<T, string>>
-  createRoute: CreateNestedRoute<T>
+  createRoute: CreateNestedRouteOnWithParams<T>
 }
-export type Route<T extends string | undefined = string> = T extends string ? RouteWithParams<T> : RouteWithoutParams
+export type Route<T extends string = string> = T extends string ? RouteWithParams<T> : RouteWithoutParams
 
 const mergeRouteStrings = (...routeStrings: string[]) => {
-  const routeStringsWithoutSlashes = routeStrings.map((routeString) => routeString.replace(/^\/|\/$/g, ''))
-  return routeStringsWithoutSlashes.join('/')
+  const routeStringsWithoutEndingSlashes = routeStrings.map((routeString) => routeString.replace(/^\/|\/$/g, ''))
+  return routeStringsWithoutEndingSlashes.join('/')
+}
+const prependSlash = (route: string) => {
+  if (!route.startsWith('/')) {
+    return `/${route}`
+  }
+  return route
+}
+const prependSlashIfNoProtocol = (route: string) => {
+  const hasProtocol = route.match(/^[a-z]+:\/\//)
+  if (hasProtocol) {
+    return route
+  }
+  return prependSlash(route)
 }
 
 const normalizeCreateRouteInput = (routeParamsOrGetRoute: any, maybeGetRoute: any) => {
@@ -161,11 +186,10 @@ function createRoute(routeParamsOrGetRoute?: any, maybeGetRoute?: any) {
     })()
     const parentRouteString = parentRoute?.get({ ...routeParams, abs: false } as any) || ''
     const relativePath = `${mergeRouteStrings(parentRouteString, route)}${searchParamsString}${anchorString}`
-    if (routeParams?.abs) {
-      return mergeRouteStrings(routeParams.baseUrl || defaultBaseUrl || '', relativePath)
-    } else {
-      return relativePath
-    }
+    const result = routeParams?.abs
+      ? mergeRouteStrings(routeParams.baseUrl || defaultBaseUrl || '/', relativePath)
+      : relativePath
+    return prependSlashIfNoProtocol(result)
   }
 
   const route = {
