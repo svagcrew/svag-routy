@@ -1,4 +1,3 @@
-/* eslint-disable func-style */
 type Stringable = string | number
 
 type PumpedRouteGetterInputBase = {
@@ -8,27 +7,27 @@ type PumpedRouteGetterInputBase = {
   anchor?: string
 }
 
-type CreateRoute = {
+type CreateRoutyRoute = {
   <T extends string>(props: {
     params?: T[]
     getter: (routeParams: Record<T, Stringable>) => string | (() => string) | string
     baseUrl?: string
     definitionParamsPrefix?: string
-  }): RouteWithParams<T>
+  }): RoutyRouteWithParams<T>
   <T extends string, T2 extends string>(props: {
-    parent?: Route<T2>
+    parent?: RoutyRoute<T2>
     params?: T[]
     getter: (routeParams: Record<T, Stringable>) => string | (() => string) | string
     baseUrl?: string
     definitionParamsPrefix?: string
-  }): RouteWithParams<T | T2>
+  }): RoutyRouteWithParams<T | T2>
   <T extends string>(
     routeParamsDefinition: T[],
     routeGetter: (routeParams: Record<T, Stringable>) => string
-  ): RouteWithParams<T>
-  (routeGetter: () => string): RouteWithoutParams
-  (routeString: string): RouteWithoutParams
-  (routeParamsOrGetRoute?: any, maybeGetRoute?: any): Route
+  ): RoutyRouteWithParams<T>
+  (routeGetter: () => string): RoutyRouteWithoutParams
+  (routeString: string): RoutyRouteWithoutParams
+  (routeParamsOrGetRoute?: any, maybeGetRoute?: any): RoutyRoute
 }
 
 type CreateNestedRouteOnWithoutParams = {
@@ -37,13 +36,13 @@ type CreateNestedRouteOnWithoutParams = {
     getter: (routeParams: Record<T2, Stringable>) => string
     baseUrl?: string
     definitionParamsPrefix?: string
-  }): T2 extends string ? RouteWithParams<T2> : RouteWithoutParams
+  }): T2 extends string ? RoutyRouteWithParams<T2> : RoutyRouteWithoutParams
   <T2 extends string>(
     routeParamsDefinition: T2[],
     routeGetter: (routeParams: Record<T2, Stringable>) => string
-  ): RouteWithParams<T2>
-  (routeGetter: () => string): RouteWithoutParams
-  (routeString: string): RouteWithoutParams
+  ): RoutyRouteWithParams<T2>
+  (routeGetter: () => string): RoutyRouteWithoutParams
+  (routeString: string): RoutyRouteWithoutParams
 }
 type CreateNestedRouteOnWithParams<T extends string> = {
   <T2 extends string>(props: {
@@ -51,36 +50,36 @@ type CreateNestedRouteOnWithParams<T extends string> = {
     getter: (routeParams: Record<T2, Stringable>) => string
     baseUrl?: string
     definitionParamsPrefix?: string
-  }): RouteWithParams<T extends string ? T | T2 : T2>
+  }): RoutyRouteWithParams<T extends string ? T | T2 : T2>
   <T2 extends string>(
     routeParamsDefinition: T2[],
     routeGetter: (routeParams: Record<T2, Stringable>) => string
-  ): RouteWithParams<T extends string ? T | T2 : T2>
-  (routeGetter: () => string): RouteWithParams<T>
-  (routeString: string): RouteWithParams<T>
+  ): RoutyRouteWithParams<T extends string ? T | T2 : T2>
+  (routeGetter: () => string): RoutyRouteWithParams<T>
+  (routeString: string): RoutyRouteWithParams<T>
 }
 
-export type RouteWithoutParams = {
+export type RoutyRouteWithoutParams = {
   get: (routeParams?: PumpedRouteGetterInputBase) => string
   placeholders: {}
   getPlaceholders: (definitionParamsPrefix?: string) => {}
   definition: string
   getDefinition: (definitionParamsPrefix?: string) => string
-  validateRouteParams: (routeParams: any) => {}
-  normalizeRouteParams: (routeParams: any) => {}
+  parseParams: (routeParams: any) => {}
+  parseParamsPartial: (routeParams: any) => {}
   createRoute: CreateNestedRouteOnWithoutParams
 }
-export type RouteWithParams<T extends string> = {
+export type RoutyRouteWithParams<T extends string> = {
   get: (routeParams: Record<T, Stringable> & PumpedRouteGetterInputBase) => string
   placeholders: Record<T, string>
   getPlaceholders: (definitionParamsPrefix?: string) => Record<T, string>
   definition: string
   getDefinition: (definitionParamsPrefix?: string) => string
-  validateRouteParams: (routeParams: any) => Record<T, string>
-  normalizeRouteParams: (routeParams: any) => Partial<Record<T, string>>
+  parseParams: (routeParams: any) => Record<T, string>
+  parseParamsPartial: (routeParams: any) => Partial<Record<T, string>>
   createRoute: CreateNestedRouteOnWithParams<T>
 }
-export type Route<T extends string = string> = T extends string ? RouteWithParams<T> : RouteWithoutParams
+export type RoutyRoute<T extends string = string> = T extends string ? RoutyRouteWithParams<T> : RoutyRouteWithoutParams
 
 const mergeRouteStrings = (...routeStrings: string[]) => {
   const routeStringsWithoutEndingSlashes = routeStrings.map((routeString) => routeString.replace(/^\/|\/$/g, ''))
@@ -132,7 +131,7 @@ const normalizeCreateRouteInput = (routeParamsOrGetRoute: any, maybeGetRoute: an
     typeof routeParamsOrGetRoute === 'object' && 'getter' in routeParamsOrGetRoute
       ? routeParamsOrGetRoute.definitionParamsPrefix
       : undefined
-  const parentRoute: Route | undefined =
+  const parentRoute: RoutyRoute | undefined =
     typeof routeParamsOrGetRoute === 'object' && 'getter' in routeParamsOrGetRoute
       ? routeParamsOrGetRoute.parent
       : undefined
@@ -145,7 +144,7 @@ const normalizeCreateRouteInput = (routeParamsOrGetRoute: any, maybeGetRoute: an
   }
 }
 
-const createRoute: CreateRoute = (routeParamsOrGetRoute?: any, maybeGetRoute?: any) => {
+const createRoute: CreateRoutyRoute = (routeParamsOrGetRoute?: any, maybeGetRoute?: any) => {
   const { routeParamsDefinition, routeGetter, defaultBaseUrl, defaultDefinitionParamsPrefix, parentRoute } =
     normalizeCreateRouteInput(routeParamsOrGetRoute, maybeGetRoute)
   const getPlaceholders = (definitionParamsPrefix: string = ':') => {
@@ -169,7 +168,7 @@ const createRoute: CreateRoute = (routeParamsOrGetRoute?: any, maybeGetRoute?: a
   }
   const definition = getDefinition(defaultDefinitionParamsPrefix)
 
-  const validateRouteParams = (routeParams: any) => {
+  const parseParams = (routeParams: any) => {
     const routeParamsKeys = Object.keys(routeParams)
     const routeParamsDefinitionKeys = routeParamsDefinition || []
     const missingKeys = routeParamsDefinitionKeys.filter((key) => !routeParamsKeys.includes(key))
@@ -178,7 +177,7 @@ const createRoute: CreateRoute = (routeParamsOrGetRoute?: any, maybeGetRoute?: a
     }
     return routeParams
   }
-  const normalizeRouteParams = (routeParams: any) => {
+  const parseParamsPartial = (routeParams: any) => {
     const routeParamsDefinitionKeys = routeParamsDefinition || []
     const normalizedRouteParams = routeParamsDefinitionKeys.reduce(
       (acc, key) => {
@@ -218,8 +217,8 @@ const createRoute: CreateRoute = (routeParamsOrGetRoute?: any, maybeGetRoute?: a
     placeholders,
     getDefinition,
     definition,
-    validateRouteParams,
-    normalizeRouteParams,
+    parseParams,
+    parseParamsPartial,
     get: pumpedRouteGetter,
   }
 
@@ -241,7 +240,7 @@ const createRoute: CreateRoute = (routeParamsOrGetRoute?: any, maybeGetRoute?: a
   }
 }
 
-export type RouteParams<T extends { placeholders: Record<string, string> }> = T['placeholders']
+export type RoutyRouteParams<T extends { placeholders: Record<string, string> }> = T['placeholders']
 
 export const createRoutyThings = ({
   baseUrl = '',
