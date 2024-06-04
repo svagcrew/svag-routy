@@ -164,7 +164,7 @@ const createRoute: CreateRoutyRoute = (routeParamsOrGetRoute?: any, maybeGetRout
     const placeholdersHere = getPlaceholders(definitionParamsPrefix)
     const selfRouteString = routeGetter(placeholdersHere)
     const parentRouteString = parentRoute?.getDefinition(definitionParamsPrefix) || ''
-    return mergeRouteStrings(parentRouteString, selfRouteString)
+    return prependSlashIfNoProtocol(mergeRouteStrings(parentRouteString, selfRouteString))
   }
   const definition = getDefinition(defaultDefinitionParamsPrefix)
 
