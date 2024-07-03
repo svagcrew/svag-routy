@@ -226,13 +226,13 @@ const createRoute: CreateRoutyRoute = (routeParamsOrGetRoute?: any, maybeGetRout
     const {
       routeParamsDefinition,
       routeGetter,
-      defaultBaseUrl,
+      defaultBaseUrl: nestedDefaultBaseUrl,
       defaultDefinitionParamsPrefix: nestedDefaultDefinitionParamsPrefix,
     } = normalizeCreateRouteInput(routeParamsOrGetRoute, maybeGetRoute)
     return (createRoute as any)({
       params: routeParamsDefinition,
       getter: routeGetter,
-      baseUrl: defaultBaseUrl,
+      baseUrl: nestedDefaultBaseUrl || defaultBaseUrl,
       definitionParamsPrefix: nestedDefaultDefinitionParamsPrefix || defaultDefinitionParamsPrefix,
       parent: route,
     })
