@@ -32,15 +32,16 @@ type CreateRoutyRoute = {
 
 type CreateNestedRouteOnWithoutParams = {
   <T2 extends string>(props: {
-    params?: T2[]
+    params: T2[]
     getter: (routeParams: Record<T2, Stringable>) => string
     baseUrl?: string
     definitionParamsPrefix?: string
-  }): T2 extends string ? RoutyRouteWithParams<T2> : RoutyRouteWithoutParams
+  }): RoutyRouteWithParams<T2>
   <T2 extends string>(
     routeParamsDefinition: T2[],
     routeGetter: (routeParams: Record<T2, Stringable>) => string
   ): RoutyRouteWithParams<T2>
+  (props: { getter: () => string; baseUrl?: string; definitionParamsPrefix?: string }): RoutyRouteWithoutParams
   (routeGetter: () => string): RoutyRouteWithoutParams
   (routeString: string): RoutyRouteWithoutParams
 }
